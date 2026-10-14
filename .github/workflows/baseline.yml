@@ -1,0 +1,64 @@
+name: baseline
+
+on:
+  workflow_dispatch:
+    inputs:
+      fill_gb:
+        description: "Fill the store to this size first (0 to skip)"
+        default: "0"
+
+env:
+  NIXPKGS: github:NixOS/nixpkgs/nixos-25.05
+
+jobs:
+  test:
+    runs-on: blacksmith-32vcpu-ubuntu-2404
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Create Nix directories
+        run: sudo mkdir -p /nix/store && sudo chmod -R 777 /nix
+
+      - name: Mount Nix store
+        uses: useblacksmith/stickydisk@v1
+        with:
+          key: ${{ github.repository }}-nix-baseline-${{ runner.os }}
+          path: /nix
+
+      - name: Remove existing Nix socket
+        run: |
+          sudo chown root /nix
+          sudo rm -f /nix/var/nix/daemon-socket/socket /nix/receipt.json
+
+      - name: Install Nix
+        uses: cachix/install-nix-action@v31
+        with:
+          extra_nix_config: |
+            experimental-features = nix-command flakes
+            accept-flake-config = true
+
+      - name: Store stats
+        run: scripts/store-stats.sh
+
+      - name: Fill store
+        if: inputs.fill_gb != '0'
+        run: scripts/fill-store.sh "${{ inputs.fill_gb }}"
+
+      - name: Install packages
+        run: nix profile install "$NIXPKGS#postgresql_17" "$NIXPKGS#postgresql_15"
+
+      - name: Start services
+        run: scripts/services.sh start
+
+      - name: Run tests
+        run: scripts/services.sh test
+
+      - name: Stop services
+        run: scripts/services.sh stop
+
+      - name: Cleanup Nix daemon and processes
+        if: always()
+        run: |
+          sudo pkill -9 nix-daemon || true
+          sudo fuser -km /nix || true
+          sudo lsof +D /nix 2>/dev/null | awk 'NR>1 {print $2}' | sort -u | xargs -r sudo kill -9 || true

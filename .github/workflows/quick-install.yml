@@ -1,0 +1,71 @@
+name: quick-install
+
+on:
+  workflow_dispatch:
+    inputs:
+      fill_gb:
+        description: "Fill the store to this size first (0 to skip)"
+        default: "0"
+      parallel:
+        description: "Number of concurrent jobs sharing the disk"
+        default: "1"
+
+env:
+  NIXPKGS: github:NixOS/nixpkgs/nixos-25.05
+
+jobs:
+  test:
+    runs-on: blacksmith-32vcpu-ubuntu-2404
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: ${{ fromJSON(inputs.parallel == '1' && '[1]' || '[1,2,3,4]') }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Mount Nix store
+        uses: useblacksmith/stickydisk@v1
+        with:
+          key: ${{ github.repository }}-nix-quick-${{ runner.os }}
+          path: /nix
+
+      - name: Own mountpoint
+        run: |
+          echo "uid=$(id -u) gid=$(id -g)"
+          stat -c '%U:%G %n' /nix /nix/store 2>/dev/null || true
+          sudo chown "$(id -u):$(id -g)" /nix
+
+      - name: Install Nix
+        uses: nixbuild/nix-quick-install-action@v35
+        with:
+          nix_conf: |
+            experimental-features = nix-command flakes
+            accept-flake-config = true
+
+      - name: Store stats
+        run: scripts/store-stats.sh
+
+      - name: Fill store
+        if: inputs.fill_gb != '0'
+        run: scripts/fill-store.sh "${{ inputs.fill_gb }}"
+
+      - name: Install packages
+        run: nix profile install "$NIXPKGS#postgresql_17" "$NIXPKGS#postgresql_15"
+
+      - name: Start services
+        run: scripts/services.sh start
+
+      - name: Run tests
+        run: scripts/services.sh test
+
+      - name: Stop services
+        run: scripts/services.sh stop
+
+      - name: Garbage collect
+        if: always()
+        env:
+          GC_THRESHOLD_GB: "200"
+        run: |
+          used=$(du -sx --block-size=1G /nix | cut -f1)
+          echo "store: ${used}G"
+          if [ "$used" -gt "$GC_THRESHOLD_GB" ]; then nix-collect-garbage; fi
