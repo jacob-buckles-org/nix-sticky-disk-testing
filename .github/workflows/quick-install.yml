@@ -50,7 +50,9 @@ jobs:
         run: scripts/fill-store.sh "${{ inputs.fill_gb }}"
 
       - name: Install packages
-        run: nix profile install "$NIXPKGS#postgresql_17" "$NIXPKGS#postgresql_15"
+        run: |
+          nix profile install "$NIXPKGS#postgresql_17"
+          nix build --no-link "$NIXPKGS#postgresql_15"
 
       - name: Start services
         run: scripts/services.sh start
