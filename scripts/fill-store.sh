@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 TARGET_GB=${1:?usage: fill-store.sh <gb>}
-FILES_PER_PATH=${FILES_PER_PATH:-200}
-MAX_FILE_KB=${MAX_FILE_KB:-64}
+FILES_PER_PATH=${FILES_PER_PATH:-500}
+MAX_FILE_KB=${MAX_FILE_KB:-26}
 BATCH=${BATCH:-250}
 
 nix build --no-link "$NIXPKGS#postgresql_17" "$NIXPKGS#postgresql_15" "$NIXPKGS#go" \

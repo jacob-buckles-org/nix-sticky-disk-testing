@@ -22,20 +22,24 @@ jobs:
       - name: Mount Nix store
         uses: useblacksmith/stickydisk@v1
         with:
-          key: ${{ github.repository }}-nix-baseline-v2-${{ runner.os }}
+          key: ${{ github.repository }}-nix-baseline-v3-${{ runner.os }}
           path: /nix
 
       - name: Remove existing Nix socket
         run: |
-          sudo chown root /nix
-          sudo rm -f /nix/var/nix/daemon-socket/socket /nix/receipt.json
+          sudo rm /nix/var/nix/daemon-socket/socket /nix/receipt.json || true
+          sudo chown root /nix /nix/var /nix/var/nix || true
 
       - name: Install Nix
         uses: cachix/install-nix-action@v31
         with:
+          install_url: https://releases.nixos.org/nix/nix-2.35.2/install
+          enable_kvm: true
+          set_as_trusted_user: true
           extra_nix_config: |
             experimental-features = nix-command flakes
             accept-flake-config = true
+            http-connections = 128
 
       - name: Store stats
         run: scripts/store-stats.sh
@@ -61,7 +65,10 @@ jobs:
       - name: Cleanup Nix daemon and processes
         if: always()
         run: |
-          sudo systemctl stop nix-daemon.socket nix-daemon.service || true
+          sudo systemctl stop nix-daemon.socket || true
+          sudo systemctl stop nix-daemon.service || true
           sudo pkill -9 nix-daemon || true
           sudo fuser -km /nix || true
-          sudo lsof +D /nix 2>/dev/null | awk 'NR>1 {print $2}' | sort -u | xargs -r sudo kill -9 || true
+          sleep 2
+          sudo lsof +D /nix 2>/dev/null | awk 'NR>1 {print $2}' | xargs -r sudo kill -9 || true
+          sleep 2
