@@ -68,6 +68,6 @@ jobs:
         env:
           GC_THRESHOLD_GB: "200"
         run: |
-          used=$(du -sx --block-size=1G /nix | cut -f1)
+          used=$(df --output=used -BG /nix | tail -1 | tr -dc 0-9)
           echo "store: ${used}G"
           if [ "$used" -gt "$GC_THRESHOLD_GB" ]; then nix-collect-garbage; fi
