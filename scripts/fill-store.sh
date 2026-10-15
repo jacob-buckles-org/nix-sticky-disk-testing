@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 set -euo pipefail
 TARGET_GB=${1:?usage: fill-store.sh <gb>}
-FILES_PER_PATH=${FILES_PER_PATH:-60}
+FILES_PER_PATH=${FILES_PER_PATH:-200}
 MAX_FILE_KB=${MAX_FILE_KB:-64}
-BATCH=${BATCH:-500}
+BATCH=${BATCH:-250}
 
 nix build --no-link "$NIXPKGS#postgresql_17" "$NIXPKGS#postgresql_15" "$NIXPKGS#go" \
   "$NIXPKGS#nodejs" "$NIXPKGS#python3" "$NIXPKGS#docker-compose" "$NIXPKGS#rustc"

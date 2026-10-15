@@ -22,7 +22,7 @@ jobs:
       - name: Mount Nix store
         uses: useblacksmith/stickydisk@v1
         with:
-          key: ${{ github.repository }}-nix-baseline-${{ runner.os }}
+          key: ${{ github.repository }}-nix-baseline-v2-${{ runner.os }}
           path: /nix
 
       - name: Remove existing Nix socket
